@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	RepoCacheDir       = "/tmp/.imageMining"
+	//My data volume
+	RepoCacheDir       = "/image-data/.imageMining"
 	DockerOfficialRepo = "https://github.com/docker-library/official-images.git"
 	DockerRepoName     = "official-images"
 	DockerOfficialDir  = "library"
