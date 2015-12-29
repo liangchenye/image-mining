@@ -1,6 +1,7 @@
 package libs
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -19,6 +20,23 @@ type Image struct {
 	Tag    string
 
 	LayerInfo Layer
+}
+
+func ImageNew(format string, user string, repo string, tag string) (Image, error) {
+	if format == "" {
+		return Image{}, errors.New("'Format' is mandatory.")
+	}
+
+	if repo == "" {
+		return Image{}, errors.New("'Repo' is mandatory.")
+	}
+
+	if tag == "" {
+		return Image{}, errors.New("'Tag' is mandatory.")
+	}
+	image := Image{Format: format, User: user, Repo: repo, Tag: tag}
+
+	return image, nil
 }
 
 func (image *Image) Pull() error {

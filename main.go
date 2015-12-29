@@ -9,5 +9,6 @@ import (
 
 func main() {
 	collect.LoadRepos()
+	collect.ListImages()
 	fmt.Println("hello")
 }

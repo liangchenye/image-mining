@@ -1,10 +1,14 @@
 package imagesource
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 
 	"github.com/liangchenye/image-mining/collect"
 	"github.com/liangchenye/image-mining/libs"
@@ -35,7 +39,6 @@ func (doi *DockerOfficialImage) Load() bool {
 	}
 
 	gitFile := path.Join(RepoCacheDir, DockerRepoName, ".git")
-	fmt.Println(gitFile)
 	if _, err = os.Stat(gitFile); err != nil {
 		c := exec.Command("/bin/sh", "-c", fmt.Sprintf("git clone %s", DockerOfficialRepo))
 		c.Dir = RepoCacheDir
@@ -45,10 +48,47 @@ func (doi *DockerOfficialImage) Load() bool {
 		c.Dir = path.Join(RepoCacheDir, DockerRepoName)
 		c.Run()
 	}
+
 	return true
 }
 
 func (doi *DockerOfficialImage) ListImages() (images []libs.Image) {
+	officialRepoDir := path.Join(RepoCacheDir, DockerRepoName, DockerOfficialDir)
+	files, _ := ioutil.ReadDir(officialRepoDir)
 
+	for _, file := range files {
+		uri := path.Join(officialRepoDir, file.Name())
+		images = append(images, readImagesFromFile(uri)...)
+	}
+
+	return images
+}
+
+func readImagesFromFile(uri string) (images []libs.Image) {
+	f, err := os.Open(uri)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	defer f.Close()
+
+	rd := bufio.NewReader(f)
+	for {
+		line, err := rd.ReadString('\n')
+
+		if err != nil || io.EOF == err {
+			break
+		}
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		strs := strings.Split(line, ":")
+		if len(strs) > 1 {
+			if image, err := libs.ImageNew("Docker", "", path.Base(uri), strs[0]); err == nil {
+				fmt.Println(image)
+				images = append(images, image)
+			}
+		}
+	}
 	return images
 }
