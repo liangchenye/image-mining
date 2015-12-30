@@ -65,30 +65,32 @@ func ImageNew(format string, user string, repo string, tag string) (Image, error
 }
 
 func (image *Image) Pull() error {
-	if cached, err := image.cached(); err != nil {
-		return err
-	} else if cached {
+	imageName := image.GetID()
+	if imageName != "" {
+		fmt.Println("Already pulled")
 		return nil
 	}
+
 	_, err := ExecCmd("", "docker", "pull", fmt.Sprintf("%s:%s", image.Repo, image.Tag))
 	return err
 }
 
+//Assume it was alreay pulled..
 func (image *Image) Scan() error {
-	if _, err := image.Save(); err != nil {
+	if _, err := image.History(); err != nil {
 		return err
 	}
 
-	if _, err := image.History(); err != nil {
+	if _, err := image.Save(); err != nil {
 		return err
 	}
 
 	for i := 0; i < len(image.Layers); i++ {
 		var err error
 		if i > 0 {
-			err = analyzeLayer(clairHost, image.Path+"/"+image.Layers[i]+"/layer.tar", image.Layers[i], image.Layers[i-1], "Docker")
+			err = analyzeLayer(clairHost, image.Path+"/"+image.Layers[i]+"/layer.tar.gz", image.Layers[i], image.Layers[i-1], "Docker")
 		} else {
-			err = analyzeLayer(clairHost, image.Path+"/"+image.Layers[i]+"/layer.tar", image.Layers[i], "", "Docker")
+			err = analyzeLayer(clairHost, image.Path+"/"+image.Layers[i]+"/layer.tar.gz", image.Layers[i], "", "Docker")
 		}
 		if err != nil {
 			fmt.Println("- Could not analyze layer: %s\n", err)
@@ -97,21 +99,25 @@ func (image *Image) Scan() error {
 	return nil
 }
 
-func (image *Image) GetVuln() {
-	vulnerabilities, err := getVulnerabilities(clairHost, image.ID, "Low")
+func (image *Image) GetVuln() ([]APIVulnerability, error) {
+	response, err := http.Get(clairHost + fmt.Sprintf(getLayerVulnerabilitiesURI, image.ID, "Low"))
 	if err != nil {
-		fmt.Println("- Could not get vulnerabilities: %s\n", err)
+		return []APIVulnerability{}, err
 	}
-	if len(vulnerabilities) == 0 {
-		fmt.Println("Bravo, your image looks SAFE !")
-	}
-	for _, vulnerability := range vulnerabilities {
-		fmt.Printf("- # %s\n", vulnerability.ID)
-		fmt.Printf("  - Priority:    %s\n", vulnerability.Priority)
-		fmt.Printf("  - Link:        %s\n", vulnerability.Link)
-		fmt.Printf("  - Description: %s\n", vulnerability.Description)
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(response.Body)
+		return []APIVulnerability{}, fmt.Errorf("Got response %d with message %s", response.StatusCode, string(body))
 	}
 
+	var apiResponse APIVulnerabilitiesResponse
+	err = json.NewDecoder(response.Body).Decode(&apiResponse)
+	if err != nil {
+		return []APIVulnerability{}, err
+	}
+
+	return apiResponse.Vulnerabilities, nil
 }
 
 func (image *Image) Save() (string, error) {
@@ -122,7 +128,7 @@ func (image *Image) Save() (string, error) {
 	}
 	//My data volume.
 	image.Path = path.Join("/image-data/docker-images", "official", imageName)
-	topTar := path.Join(image.Path, imageName, "layer.tar")
+	topTar := path.Join(image.Path, imageName, "layer.tar.gz")
 	if _, err := os.Stat(topTar); err == nil {
 		fmt.Println("Already saved")
 		return image.Path, nil
@@ -157,6 +163,14 @@ func (image *Image) Save() (string, error) {
 	err = extract.Wait()
 	if err != nil {
 		return "", errors.New(stderr.String())
+	}
+
+	//Compress all the layers
+	if len(image.Layers) == 0 {
+		image.History()
+	}
+	for i := 0; i < len(image.Layers); i++ {
+		compressLayer(image.Path + "/" + image.Layers[i] + "/layer.tar")
 	}
 
 	return image.Path, nil
@@ -234,14 +248,26 @@ func (image *Image) cached() (bool, error) {
 func (image *Image) save() {
 }
 
-func analyzeLayer(endpoint, imagePath, layerID, parentLayerID, imageFormat string) error {
+//In order to save disk and make the scan fast in the bad network
+func compressLayer(uri string) (string, error) {
+	newUri := uri + ".gz"
+	if _, err := ExecCmd("", "tar", "czvf", newUri, uri); err == nil {
+		os.Remove(uri)
+		return newUri, nil
+	} else {
+		fmt.Println(err)
+		return "", err
+	}
+}
+
+func analyzeLayer(clairHost, imagePath, layerID, parentLayerID, imageFormat string) error {
 	payload := Layer{ID: layerID, Path: imagePath, ParentID: parentLayerID, ImageFormat: imageFormat}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	request, err := http.NewRequest("POST", endpoint+postLayerURI, bytes.NewBuffer(jsonPayload))
+	request, err := http.NewRequest("POST", clairHost+postLayerURI, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return err
 	}
@@ -260,25 +286,4 @@ func analyzeLayer(endpoint, imagePath, layerID, parentLayerID, imageFormat strin
 	}
 
 	return nil
-}
-
-func getVulnerabilities(endpoint, layerID, minimumPriority string) ([]APIVulnerability, error) {
-	response, err := http.Get(endpoint + fmt.Sprintf(getLayerVulnerabilitiesURI, layerID, minimumPriority))
-	if err != nil {
-		return []APIVulnerability{}, err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(response.Body)
-		return []APIVulnerability{}, fmt.Errorf("Got response %d with message %s", response.StatusCode, string(body))
-	}
-
-	var apiResponse APIVulnerabilitiesResponse
-	err = json.NewDecoder(response.Body).Decode(&apiResponse)
-	if err != nil {
-		return []APIVulnerability{}, err
-	}
-
-	return apiResponse.Vulnerabilities, nil
 }

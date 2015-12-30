@@ -38,5 +38,11 @@ func ExecCmd(path string, arg1 string, args ...string) (string, error) {
 		retStr = string(retb)
 	}
 
+	err = cmd.Wait()
+	if err != nil {
+		retb, _ := ioutil.ReadAll(stderr)
+		retStr = string(retb)
+	}
+
 	return retStr, err
 }
