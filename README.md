@@ -43,6 +43,6 @@ And the etc...
 
 ###TODO
 1. Continue to make a better 'image-mining' work
-2. Clair is slow 
+2. Help Clair to be fast
    Even the query takes time. (30ms ~120ms per query)
 
