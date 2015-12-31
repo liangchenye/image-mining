@@ -239,8 +239,6 @@ func (image *Image) cached() (bool, error) {
 	//Check with the local db
 	return false, nil
 }
-func (image *Image) save() {
-}
 
 //In order to save disk and make the scan fast in the bad network
 func compressLayer(uri string) (string, error) {
