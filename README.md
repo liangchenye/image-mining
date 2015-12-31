@@ -45,4 +45,4 @@ And the etc...
 1. Continue to make a better 'image-mining' work
 2. Help Clair to be fast
    Even the query takes time. (30ms ~120ms per query)
-
+3. Tell the user to update to a 'safer' image
