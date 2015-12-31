@@ -86,7 +86,6 @@ func readImagesFromFile(uri string) (images []libs.Image) {
 		strs := strings.Split(line, ":")
 		if len(strs) > 1 {
 			if image, err := libs.ImageNew("Docker", "", path.Base(uri), strs[0]); err == nil {
-				fmt.Println(image)
 				images = append(images, image)
 			}
 		}

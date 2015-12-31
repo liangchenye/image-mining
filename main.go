@@ -5,11 +5,18 @@ import (
 
 	"github.com/liangchenye/image-mining/collect"
 	_ "github.com/liangchenye/image-mining/collect/imagesource"
+	"github.com/liangchenye/image-mining/libs"
 )
 
 func main() {
 	collect.LoadRepos()
 	images := collect.ListImages()
+	ScanImage1(images)
+
+	ScanImage2(images)
+}
+
+func ScanImage1(images []libs.Image) {
 	for _, image := range images {
 		fmt.Println("Start to pull: ", image)
 		if err := image.Pull(); err != nil {
@@ -29,5 +36,14 @@ func main() {
 				fmt.Println("Critical ", len(vulns), " found in ", image)
 			}
 		}
+	}
+}
+
+//analyse after scanImage1
+func ScanImage2(images []libs.Image) {
+	for _, image := range images {
+		vulns := image.GetVulns()
+		vs, _ := image.GetVuln()
+		fmt.Println(image.Repo, image.Tag, len(vs), vulns)
 	}
 }

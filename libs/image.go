@@ -36,9 +36,8 @@ type Layer struct {
 	ImageFormat string
 }
 
-//Only support 'docker' at present
 type Image struct {
-	Format string //Docker or ACI
+	Format string //Docker or ACI, only Docker now
 	User   string
 	Repo   string
 	Tag    string
@@ -77,10 +76,6 @@ func (image *Image) Pull() error {
 
 //Assume it was alreay pulled..
 func (image *Image) Scan() error {
-	if _, err := image.History(); err != nil {
-		return err
-	}
-
 	if _, err := image.Save(); err != nil {
 		return err
 	}
@@ -99,25 +94,24 @@ func (image *Image) Scan() error {
 	return nil
 }
 
+func (image *Image) GetVulns() (vulns []int) {
+	if len(image.Layers) == 0 {
+		image.History()
+	}
+	for i := 0; i < len(image.Layers); i++ {
+		if layers, err := getVulnByID(image.Layers[i]); err == nil {
+			vulns = append(vulns, len(layers))
+		} else {
+			vulns = append(vulns, -1)
+		}
+
+	}
+
+	return vulns
+}
+
 func (image *Image) GetVuln() ([]APIVulnerability, error) {
-	response, err := http.Get(clairHost + fmt.Sprintf(getLayerVulnerabilitiesURI, image.ID, "Low"))
-	if err != nil {
-		return []APIVulnerability{}, err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(response.Body)
-		return []APIVulnerability{}, fmt.Errorf("Got response %d with message %s", response.StatusCode, string(body))
-	}
-
-	var apiResponse APIVulnerabilitiesResponse
-	err = json.NewDecoder(response.Body).Decode(&apiResponse)
-	if err != nil {
-		return []APIVulnerability{}, err
-	}
-
-	return apiResponse.Vulnerabilities, nil
+	return getVulnByID(image.ID)
 }
 
 func (image *Image) Save() (string, error) {
@@ -286,4 +280,25 @@ func analyzeLayer(clairHost, imagePath, layerID, parentLayerID, imageFormat stri
 	}
 
 	return nil
+}
+
+func getVulnByID(ID string) ([]APIVulnerability, error) {
+	response, err := http.Get(clairHost + fmt.Sprintf(getLayerVulnerabilitiesURI, ID, "Low"))
+	if err != nil {
+		return []APIVulnerability{}, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(response.Body)
+		return []APIVulnerability{}, fmt.Errorf("Got response %d with message %s", response.StatusCode, string(body))
+	}
+
+	var apiResponse APIVulnerabilitiesResponse
+	err = json.NewDecoder(response.Body).Decode(&apiResponse)
+	if err != nil {
+		return []APIVulnerability{}, err
+	}
+
+	return apiResponse.Vulnerabilities, nil
 }
