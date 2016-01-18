@@ -9,43 +9,44 @@ import (
 )
 
 func DemoImage() Image {
-	return Image{Format: "Docker", User: "", Repo: "erlang", Tag: "18.1"}
+	return Image{Format: "Docker", User: "docker.io", Repo: "alpine", Tag: "edge"}
 }
 
 func TestImagePull(t *testing.T) {
-	//image := DemoImage()
-	// image.Pull()
+	image := DemoImage()
+	image.Pull()
 }
 
 func TestImageID(t *testing.T) {
 	image := DemoImage()
 
 	id := image.GetID()
-	fmt.Println(id)
+	fmt.Println("Get ID ", id)
 }
 
 func TestImageSave(t *testing.T) {
 	image := DemoImage()
 
 	path, err := image.Save()
-	fmt.Println(path, err)
+	fmt.Println("Save ", path, err)
 }
 
 func TestImageHistory(t *testing.T) {
 	image := DemoImage()
 
 	layers, err := image.History()
-	fmt.Println(layers, err)
+	fmt.Println("History ", layers, err)
 }
 
 func TestImageScan(t *testing.T) {
 	image := DemoImage()
 
-	err := image.Scan()
-	fmt.Println(err)
+	if err := image.Scan(); err != nil {
+		fmt.Println(err)
+	}
 
 	vulnerabilities, err := image.GetVuln()
-	if len(vulnerabilities) == 0 {
+	if err != nil && len(vulnerabilities) == 0 {
 		fmt.Println("Bravo, your image looks SAFE !")
 	}
 	for _, vulnerability := range vulnerabilities {

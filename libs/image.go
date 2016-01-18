@@ -245,10 +245,9 @@ func (image *Image) cached() (bool, error) {
 
 //In order to save disk and make the scan fast in the bad network
 func compressLayer(uri string) (string, error) {
-	newUri := uri + ".gz"
-	if _, err := ExecCmd("", "tar", "czvf", newUri, uri); err == nil {
-		os.Remove(uri)
-		return newUri, nil
+	fmt.Println("compress", uri)
+	if _, err := ExecCmd("", "gzip", uri); err == nil {
+		return uri + ".gz", nil
 	} else {
 		fmt.Println(err)
 		return "", err
