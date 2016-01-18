@@ -121,7 +121,7 @@ func (image *Image) Save() (string, error) {
 		return "", errors.New("Cannot find the image, try to pull.")
 	}
 	//My data volume.
-	image.Path = path.Join("/image-data/docker-images", "official", imageName)
+	image.Path = path.Join("/tmp/image-data/docker-images", "official", imageName)
 	topTar := path.Join(image.Path, imageName, "layer.tar.gz")
 	if _, err := os.Stat(topTar); err == nil {
 		fmt.Println("Already saved")
@@ -205,6 +205,9 @@ func (image *Image) History() ([]string, error) {
 }
 
 func (image *Image) Clear() {
+	if image.Path != "" {
+		os.RemoveAll(image.Path)
+	}
 }
 
 func (image *Image) GetID() string {
